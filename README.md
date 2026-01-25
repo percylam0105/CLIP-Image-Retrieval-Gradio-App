@@ -1,7 +1,7 @@
 # CLIP-Image-Retrieval-Gradio-App
 
 ## 📌 Description
-This repository hosts the CLIP Image Search App, an innovative text-to-image and image-to-image retrieval system tailored for the fashion domain. The app leverages a fine-tuned CLIP (Contrastive Language–Image Pretraining) model, specifically adapted using the DeepFashion dataset to enhance alignment between visual and textual representations. Unlike traditional keyword-based search engines, this system captures the nuanced semantics of fashion queries (e.g., "vintage floral dress with puff sleeves") and supports both accurate brute-force cosine similarity search and efficient FAISS-based approximate search (HNSWFlat/IVF). The project includes a user-friendly Gradio interface, a deployed demo on Hugging Face Spaces, a fine-tuned model, dataset, and finetuning notebook.
+This repository hosts the CLIP Image Search App, a text-to-image and image-to-image retrieval system tailored for the fashion domain. The app leverages a fine-tuned CLIP (Contrastive Language–Image Pretraining) model, specifically adapted using the DeepFashion dataset to enhance alignment between visual and textual representations. Unlike traditional keyword-based search engines, this system captures the nuanced semantics of fashion queries (e.g., "vintage floral dress with puff sleeves") and supports both accurate brute-force cosine similarity search and efficient FAISS-based approximate search (HNSWFlat/IVF). The project includes a user-friendly Gradio interface, a deployed demo on Hugging Face Spaces, a fine-tuned model, dataset, and finetuning notebook.
 
 ## Demo & Resources
 [![YouTube Project Demo Video](https://img.shields.io/badge/YouTube-Demo_Video-ff0000?logo=youtube)](https://www.youtube.com/watch?v=6h3SuES8a-M)
@@ -41,6 +41,7 @@ Deployment: Integrates a Gradio UI for interactive search and deploys on Hugging
 6. Install dependencies by running pip install -r requirements.txt in the terminal.
 7. Launch the app by executing python app.py from the terminal; a local URL (e.g., http://127.0.0.1:7860) will be provided.
 8. Access the app via the URL. You can scan the image directory to generate embeddings and FAISS index, or use precomputed embeddings from the embed_data folder to start searching immediately.
+
 
 
 
