@@ -210,7 +210,7 @@ sequenceDiagram
         V-->>API: dict(name, points_count, status)
     else failure
         V-->>API: raise
-        API->>API: log warning, return {"error": str}
+        API->>API: log warning, return error dict
     end
     API->>M: read .bucket attr (no remote call)
     M-->>API: bucket name
@@ -236,7 +236,7 @@ flowchart TD
     H[scripts/migrate_to_qdrant.py] --> I[MigrationService.migrate_embeddings_only]
     I --> J[Read df.csv TSV → image_path column]
     I --> K[Load df_image_embeds.npy]
-    I --> L{len(df) == len(embeds)?}
+    I --> L{"len(df) == len(embeds)?"}
     L -- no --> M[raise ValueError]
     L -- yes --> N[Read captions.json if present]
     N --> O[VectorStore.upsert_batch keys, embeds, captions]
@@ -295,7 +295,7 @@ sequenceDiagram
     G->>G: on_select(evt.index, rows)
     G-->>U: show score + caption
 
-    Note over U,G: Image mode swaps the input to gr.Image (type="pil")<br/>and calls search_by_image instead.
+    Note over U,G: Image mode swaps the input to gr.Image and calls search_by_image instead.
 ```
 
 ---
@@ -307,7 +307,7 @@ How a single fashion image lives across the two storage backends.
 ```mermaid
 flowchart LR
     subgraph LocalFS["Local FS (only during indexing)"]
-        IMG[/dress_001.jpg/]
+        IMG["dress_001.jpg"]
     end
     subgraph MinIO["MinIO bucket: fashion-images"]
         OBJ["object: images/dress_001.jpg"]
@@ -319,7 +319,7 @@ flowchart LR
     IMG -->|CLIP encode| VEC[(512-d vector)]
     IMG -->|ObjectStore.upload_file| OBJ
     VEC -->|VectorStore.upsert_batch| POINT
-    POINT -. payload.image_path .-> OBJ
+    POINT -.->|payload.image_path| OBJ
     OBJ -->|presigned URL| Client[(Client browser)]
 ```
 
