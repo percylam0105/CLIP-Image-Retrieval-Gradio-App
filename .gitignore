@@ -1,2 +1,4 @@
 .env
 DeepFashion/*
+Source-huggingface/.gitattributes
+Source-huggingface/.git
