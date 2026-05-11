@@ -1,0 +1,39 @@
+.env
+.env.*
+!.env.example
+
+# Repo data that shouldn't be in the image
+DeepFashion/
+Source/
+Source-huggingface/
+Notebook for finetuning/
+docs/
+tests/
+scripts/
+
+# Caches
+__pycache__/
+*.py[cod]
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Build artefacts
+build/
+dist/
+*.egg-info/
+
+# Local Qdrant / MinIO data
+qdrant_data/
+minio_data/
+hf_cache/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp

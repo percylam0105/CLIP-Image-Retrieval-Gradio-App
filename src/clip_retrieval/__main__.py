@@ -1,0 +1,39 @@
+"""Service entry point — mount Gradio onto FastAPI and run uvicorn."""
+
+from __future__ import annotations
+
+import logging
+
+import gradio as gr
+import uvicorn
+
+from clip_retrieval.api.app import create_app
+from clip_retrieval.api.dependencies import (
+    get_image_service,
+    get_search_service,
+    get_settings,
+)
+from clip_retrieval.ui.gradio_app import build_ui
+
+
+def main() -> None:
+    settings = get_settings()
+    logging.basicConfig(
+        level=settings.log_level.upper(),
+        format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    )
+
+    app = create_app()
+    ui = build_ui(get_search_service(), get_image_service())
+    gr.mount_gradio_app(app, ui, path="/ui")
+
+    uvicorn.run(
+        app,
+        host=settings.api_host,
+        port=settings.api_port,
+        log_level=settings.log_level.lower(),
+    )
+
+
+if __name__ == "__main__":
+    main()
