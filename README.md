@@ -33,14 +33,66 @@ Deployment: Integrates a Gradio UI for interactive search and deploys on Hugging
 ## How to Use the Code
 *Example app deployed on Hugging Face Space:* https://huggingface.co/spaces/anhquanlam/clip-image-search-app-deepfashion-multimodal
 
+### V1 (legacy, single Gradio script)
+
 1. Clone the repository and navigate to the Source folder. The directory structure should resemble the example below. <img width="798" height="540" alt="image" src="https://github.com/user-attachments/assets/436af77e-1dbd-407d-b849-8506bf27ba60" />
-2. Rename .env.md to .env and create a Huggingface/cache folder. 
+2. Rename .env.md to .env and create a Huggingface/cache folder.
 3. Download the dataset at: https://huggingface.co/datasets/anhquanlam/clip-deepfashion-multimodal and unzip it, ensuring it includes the images and embed_data folders.
 4. Update the .env file with the correct paths on your machine.
-5. Create and activate a virtual environment
+5. Create and activate a virtual environment.
 6. Install dependencies by running pip install -r requirements.txt in the terminal.
 7. Launch the app by executing python app.py from the terminal; a local URL (e.g., http://127.0.0.1:7860) will be provided.
 8. Access the app via the URL. You can scan the image directory to generate embeddings and FAISS index, or use precomputed embeddings from the embed_data folder to start searching immediately.
+
+### V2 (production-ready MVP — Qdrant + MinIO + FastAPI + Gradio)
+
+The `version-2` branch contains a refactored architecture that swaps the file-based
+storage (`df.csv` + `df_image_embeds.npy` + FAISS) for a real vector DB (Qdrant) and
+object storage (MinIO), and exposes the retrieval engine as both a REST API and a
+Gradio UI. See [`docs/architecture.md`](docs/architecture.md) and
+[`docs/plans/v2-implementation-plan.md`](docs/plans/v2-implementation-plan.md) for
+details.
+
+#### Quick start with Docker Compose
+
+```bash
+git checkout version-2
+cp .env.example .env       # optional: tweak credentials / paths
+make docker-up             # builds the app image + starts Qdrant + MinIO + app
+```
+
+Once the stack is up:
+
+- Swagger / ReDoc: <http://localhost:8000/docs> &nbsp;|&nbsp; <http://localhost:8000/redoc>
+- Gradio UI: <http://localhost:8000/ui>
+- Health: <http://localhost:8000/health>
+- MinIO Console: <http://localhost:9001> (`minioadmin` / `minioadmin`)
+
+#### REST endpoints
+
+| Method | Path | Body | Notes |
+|---|---|---|---|
+| `POST` | `/api/v1/search/text` | `{ "query": str, "top_k": int }` | Returns top-K results with presigned MinIO URLs. |
+| `POST` | `/api/v1/search/image` | multipart `file` + `?top_k=N` | Image-to-image search. |
+| `POST` | `/api/v1/index/` | `{ "images_dir": str? }` | Encode + upload + upsert a directory (defaults to `LEGACY_IMAGES_PATH`). |
+| `GET` | `/health` | — | Model / Qdrant / MinIO status. |
+
+#### Migration from V1
+
+If you already have the legacy `DeepFashion/embed_data/df.csv` + `df_image_embeds.npy`
+and an `images/` directory:
+
+```bash
+python scripts/upload_images_to_minio.py
+python scripts/migrate_to_qdrant.py
+```
+
+#### Running tests
+
+```bash
+make dev   # installs dev extras (pytest, httpx, ruff, mypy)
+make test
+```
 
 
 
