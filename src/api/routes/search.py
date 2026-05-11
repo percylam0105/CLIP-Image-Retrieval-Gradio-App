@@ -8,15 +8,15 @@ import logging
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from PIL import Image
 
-from clip_retrieval.api.dependencies import get_image_service, get_search_service
-from clip_retrieval.api.schemas import (
+from api.dependencies import get_image_service, get_search_service
+from api.schemas import (
     SearchResponse,
     SearchResultItem,
     TextSearchRequest,
 )
-from clip_retrieval.core.image_service import ImageService
-from clip_retrieval.core.schemas import SearchResult
-from clip_retrieval.core.search import SearchService
+from core.image_service import ImageService
+from core.schemas import SearchResult
+from core.search import SearchService
 
 logger = logging.getLogger(__name__)
 

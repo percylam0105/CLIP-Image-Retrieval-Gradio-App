@@ -3,12 +3,17 @@
 from __future__ import annotations
 
 import logging
+from importlib.metadata import PackageNotFoundError, version
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from clip_retrieval import __version__
-from clip_retrieval.api.routes import health, index, search
+from api.routes import health, index, search
+
+try:
+    __version__ = version("clip-image-retrieval")
+except PackageNotFoundError:
+    __version__ = "0.0.0+local"
 
 logger = logging.getLogger(__name__)
 

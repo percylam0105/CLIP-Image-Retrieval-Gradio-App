@@ -9,7 +9,7 @@ from datetime import timedelta
 from minio import Minio
 from minio.error import S3Error
 
-from clip_retrieval.config import Settings
+from config import Settings
 
 logger = logging.getLogger(__name__)
 

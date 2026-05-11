@@ -7,8 +7,8 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
-from clip_retrieval.config import Settings
-from clip_retrieval.db.vector_store import VectorStore
+from config import Settings
+from db.vector_store import VectorStore
 
 
 @pytest.fixture()
