@@ -28,22 +28,20 @@ space.
 
 ---
 
-## Beginner's quick start (no Python knowledge required)
+## Setup & Run
 
-> **Audience:** anyone who just wants to *run* the app on their own laptop —
-> no Python or AI background needed. Estimated time: 10–15 minutes (plus
-> ~5 GB of downloads the first time).
+> The default path uses **Docker Desktop** — one command starts the whole
+> stack (CLIP model server + Qdrant + MinIO). No Python, no `uv`, no other
+> setup needed. Estimated time: 10–15 minutes including the first-time
+> ~3–5 GB download of the model.
 >
-> If you already know your way around a terminal, jump to
-> [Developer quick start](#developer-quick-start) below.
+> Each step also has a **👩‍💻 Developer mode** call-out that shows the
+> equivalent native workflow with [`uv`](https://docs.astral.sh/uv/) for
+> contributors who want to edit `src/`, run `pytest`, or attach a debugger.
 
-The simplest way is to use **Docker Desktop**, which runs the whole stack
-(the AI model server + the two databases) in containers, so you only need to
-install **two** programs on your computer.
+### Step 1 — Install prerequisites
 
-### Step 1 — Install the two required programs
-
-Both are free.
+Install these two free programs:
 
 1. **Docker Desktop** — runs the application containers.
    - Download: <https://www.docker.com/products/docker-desktop/>
@@ -58,8 +56,10 @@ Both are free.
    - Download: <https://git-scm.com/downloads>
    - Run the installer with the default options.
 
-> No need to install Python, Node, or anything else — Docker takes care of
-> all of that inside the containers.
+> **👩‍💻 Developer mode** — also install Python ≥ 3.10 and
+> [`uv`](https://docs.astral.sh/uv/) (Astral's fast Python package manager).
+> Install uv with `curl -LsSf https://astral.sh/uv/install.sh | sh`
+> (macOS / Linux) or `pipx install uv` (any platform).
 
 ### Step 2 — Open a terminal
 
@@ -71,7 +71,7 @@ You will run all the commands below in this window.
 
 ### Step 3 — Download the project
 
-Copy/paste the two lines below into the terminal (press Enter after each).
+Copy / paste these two lines (press Enter after each):
 
 ```bash
 git clone https://github.com/percylam0105/CLIP-Image-Retrieval-Gradio-App.git
@@ -81,20 +81,23 @@ cd CLIP-Image-Retrieval-Gradio-App
 This creates a folder named `CLIP-Image-Retrieval-Gradio-App` and moves you
 inside it.
 
+> **👩‍💻 Developer mode** — same step. Optionally copy the env template
+> with `cp .env.example .env` if you want to override defaults (model id,
+> Qdrant mode, etc.) — see [Configuration](#configuration).
+
 ### Step 4 — Start the application
 
-Run **one** command. It will build the application image the first time you
-run it (this takes ~5 minutes and downloads ~3–5 GB — the AI model is large)
-and start it in the background.
+One command. The first run builds the application image and downloads the
+CLIP model (~3–5 GB, ~5 minutes); subsequent runs start in seconds.
 
 ```bash
 docker compose up -d --build
 ```
 
-While you wait, you should see lines like `=> [internal] load build context`
-and `Pulling qdrant`. When the prompt comes back you are done.
+While you wait, you'll see lines like `=> [internal] load build context` and
+`Pulling qdrant`. When the prompt comes back the stack is up.
 
-To check that everything is running:
+Check that everything is running:
 
 ```bash
 docker compose ps
@@ -103,8 +106,19 @@ docker compose ps
 You should see three lines: `app`, `qdrant`, `minio`, all with status `Up`.
 
 > **Tip:** if you have `make` installed (macOS / Linux usually do; on Windows
-> install it via [Chocolatey](https://chocolatey.org/) or skip it), you can
-> use the shorter `make docker-up` instead of `docker compose up -d --build`.
+> install via [Chocolatey](https://chocolatey.org/) or skip it), you can use
+> the shorter `make docker-up`.
+
+> **👩‍💻 Developer mode** — run the app natively on your host so code edits
+> take effect on restart without rebuilding the image. You still need Qdrant
+> + MinIO running for the full feature set:
+> ```bash
+> docker compose up -d qdrant minio   # sidecar services only
+> uv sync                              # creates .venv, installs deps + dev tools
+> uv run clip-retrieval                # starts FastAPI on :8000 with Gradio at /ui
+> ```
+> Or with the in-memory Qdrant (no MinIO upload / persistence):
+> set `QDRANT_MODE=memory` in `.env`, skip the `docker compose` line.
 
 ### Step 5 — Open the app
 
@@ -115,21 +129,20 @@ Open your web browser and visit:
 | 🖼 The search interface (Gradio) | <http://localhost:8000/ui> |
 | 📖 The API documentation (Swagger) | <http://localhost:8000/docs> |
 | ❤️ Is everything healthy? | <http://localhost:8000/health> |
-| 📂 The image storage admin panel | <http://localhost:8000> *(MinIO console at <http://localhost:9001>, login `minioadmin` / `minioadmin`)* |
+| 📂 The image storage admin panel (MinIO console) | <http://localhost:9001> *(login `minioadmin` / `minioadmin`)* |
 
-The first time you open `/ui`, the AI model is downloaded from Hugging Face —
-this takes another minute or two. After that, searches are instant.
+The first time you open `/ui`, the AI model is loaded into memory — this can
+take a minute. After that, searches are instant.
 
-> **What if the page doesn't load?** Wait ~30 seconds and refresh — the model
-> needs a moment to warm up the first time. If it still doesn't work, see
-> [Troubleshooting](#troubleshooting) below.
+> **What if the page doesn't load?** Wait ~30 seconds and refresh. If it
+> still doesn't work, see [Troubleshooting](#troubleshooting) below.
 
 ### Step 6 — Add your own images (optional)
 
 Out of the box the app has no images indexed yet. To add some:
 
-1. Put your `.jpg` / `.jpeg` / `.png` files into a folder on your computer,
-   for example `~/my-images`.
+1. Put your `.jpg` / `.jpeg` / `.png` files into a folder on your computer
+   (e.g. `~/my-images`).
 2. Tell the app to index them. Replace the path with your actual folder:
 
    **macOS / Linux:**
@@ -146,29 +159,41 @@ Out of the box the app has no images indexed yet. To add some:
      -Body '{"images_dir": "C:/full/path/to/my-images"}'
    ```
 
-   (Alternatively, open <http://localhost:8000/docs>, expand
-   `POST /api/v1/index/`, click **Try it out**, edit the JSON, and click
-   **Execute** — no terminal needed.)
+   **No-terminal alternative:** open <http://localhost:8000/docs>, expand
+   `POST /api/v1/index/`, click **Try it out**, edit the JSON, click
+   **Execute**.
 
 3. Go back to <http://localhost:8000/ui> and search. Your images will now
    appear as results.
 
-### Step 7 — Stop the application
+> **👩‍💻 Developer mode** — if you have a pre-computed embedding dataset
+> (`df.csv` + `df_image_embeds.npy` + `captions.json`), use the migration
+> scripts instead of re-encoding:
+> ```bash
+> uv run python scripts/upload_images_to_minio.py   # upload raw images to MinIO
+> uv run python scripts/migrate_to_qdrant.py        # upsert precomputed embeddings
+> ```
+> The scripts read `LEGACY_IMAGES_PATH`, `LEGACY_INDEX_PATH`, and
+> `CAPTIONS_PATH` from `.env`.
 
-When you're done:
+### Step 7 — Stop the application
 
 ```bash
 docker compose down
 ```
 
-Your indexed images and embeddings are preserved in Docker volumes, so the
-next time you run `docker compose up -d` everything is still there.
+Indexed images and embeddings are preserved in Docker volumes — the next
+`docker compose up -d` brings everything back.
 
-To **completely wipe** everything (including indexed images), run:
+To **completely wipe** the data (drops volumes):
 
 ```bash
 docker compose down -v
 ```
+
+> **👩‍💻 Developer mode** — press `Ctrl + C` in the terminal running
+> `uv run clip-retrieval`. Run `docker compose down` separately to stop the
+> Qdrant + MinIO sidecars.
 
 ### Troubleshooting
 
@@ -179,65 +204,29 @@ docker compose down -v
 | `port is already allocated` | Another program is using port 8000, 9000, 9001, 6333, or 6334. Either stop the other program or edit `docker-compose.yml` and change the host port (the number on the **left** of `:`). |
 | Browser shows "Site can't be reached" | Wait 30 seconds and refresh. The first start has to download the model. Check progress with `docker compose logs -f app`. |
 | `out of disk space` / build fails | The model is ~3 GB. Free up ~10 GB of disk space, then re-run the build. |
-| Searches return no results | You haven't indexed any images yet. See Step 6, or use the Hugging Face dataset (link at the top). |
+| Searches return no results | You haven't indexed any images yet. See [Step 6](#step-6--add-your-own-images-optional), or use the Hugging Face dataset (link at the top). |
+| `uv: command not found` (developer mode) | `uv` is not installed or not on `PATH`. Reinstall via `curl -LsSf https://astral.sh/uv/install.sh \| sh` and restart your terminal. |
 
 ---
 
-## Developer quick start
+## Developer reference
 
-For developers who want to work on the code itself (not just run it).
+Common commands for contributors. All assume `uv sync` has been run once
+to create the `.venv`.
 
-### Prerequisites
+| `make` target | Equivalent | Purpose |
+|---|---|---|
+| `make dev` | `uv sync` | Install runtime + dev deps into `.venv` |
+| `make run` | `uv run clip-retrieval` | Start FastAPI + Gradio on :8000 |
+| `make test` | `uv run pytest tests/ -v` | Run the unit-test suite (~3s) |
+| `make lint` | `uv run ruff check src/ tests/` | Static lint |
+| `make format` | `uv run ruff format src/ tests/` | Auto-format |
+| `make lock` | `uv lock` | Regenerate `uv.lock` after editing `pyproject.toml` |
+| `make docker-up` / `make docker-down` | `docker compose up -d` / `down` | Full stack via Docker |
+| `make migrate` | `uv run python scripts/migrate_to_qdrant.py` | Upsert legacy embeddings |
 
-- Python ≥ 3.10
-- [`uv`](https://docs.astral.sh/uv/) (recommended, ~10× faster than pip).
-  Install with `curl -LsSf https://astral.sh/uv/install.sh | sh` or
-  `pipx install uv`.
-- Docker + Docker Compose if you want Qdrant + MinIO running locally.
-
-### Run locally without Docker
-
-```bash
-git clone https://github.com/percylam0105/CLIP-Image-Retrieval-Gradio-App.git
-cd CLIP-Image-Retrieval-Gradio-App
-cp .env.example .env             # optional — defaults to in-memory Qdrant
-uv sync                          # creates .venv, installs runtime + dev deps
-uv run clip-retrieval            # starts FastAPI on :8000 with Gradio at /ui
-```
-
-By default `QDRANT_MODE=memory` so you can start exploring immediately. To
-persist data across restarts, change it to `local` (file-backed at
-`QDRANT_PATH`) or `remote` (point `QDRANT_URL` at a running Qdrant instance).
-MinIO must be reachable for image uploads / presigned URLs — easiest is
-`docker compose up -d minio`.
-
-### Migrate from a pre-computed dataset
-
-If you already have `df.csv` + `df_image_embeds.npy` + `captions.json`:
-
-```bash
-uv run python scripts/upload_images_to_minio.py   # uploads images to MinIO
-uv run python scripts/migrate_to_qdrant.py        # upserts precomputed embeddings
-```
-
-The scripts read `LEGACY_IMAGES_PATH`, `LEGACY_INDEX_PATH`, and
-`CAPTIONS_PATH` from your environment / `.env`.
-
-### Useful make targets
-
-```bash
-make dev          # uv sync — installs runtime + dev deps into .venv
-make run          # starts uvicorn + Gradio
-make test         # uv run pytest tests/ -v
-make lint         # ruff check
-make format       # ruff format
-make lock         # regenerate uv.lock after editing pyproject.toml
-make docker-up    # docker compose up -d
-make docker-down  # docker compose down
-```
-
-The test suite uses Qdrant's in-memory mode and a MinIO mock, so it runs in a
-few seconds with no external services.
+The test suite uses Qdrant in-memory mode and a MinIO mock, so it requires
+no external services.
 
 ---
 
