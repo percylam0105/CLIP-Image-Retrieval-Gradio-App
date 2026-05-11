@@ -1,19 +1,31 @@
-.PHONY: install dev run test lint docker-build docker-up docker-down docker-logs migrate
+.PHONY: install dev sync lock run test lint format docker-build docker-up docker-down docker-logs migrate
+
+# --- Local development (uv) ---
 
 install:
-	pip install -e .
+	uv sync --no-dev
 
 dev:
-	pip install -e ".[dev]"
+	uv sync
+
+sync: dev
+
+lock:
+	uv lock
 
 run:
-	python -m clip_retrieval
+	uv run clip-retrieval
 
 test:
-	pytest tests/ -v
+	uv run pytest tests/ -v
 
 lint:
-	ruff check src/ tests/
+	uv run ruff check src/ tests/
+
+format:
+	uv run ruff format src/ tests/
+
+# --- Docker ---
 
 docker-build:
 	docker compose build
@@ -27,5 +39,7 @@ docker-down:
 docker-logs:
 	docker compose logs -f app
 
+# --- Migration ---
+
 migrate:
-	python scripts/migrate_to_qdrant.py
+	uv run python scripts/migrate_to_qdrant.py

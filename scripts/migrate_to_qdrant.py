@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import logging
 
-from clip_retrieval.config import Settings
-from clip_retrieval.db.migration import MigrationService
-from clip_retrieval.db.object_store import ObjectStore
-from clip_retrieval.db.vector_store import VectorStore
+from config import Settings
+from db.migration import MigrationService
+from db.object_store import ObjectStore
+from db.vector_store import VectorStore
 
 
 def main() -> None:

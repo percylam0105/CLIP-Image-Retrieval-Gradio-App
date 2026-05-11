@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from clip_retrieval.config import Settings
-from clip_retrieval.core.embedding import EmbeddingService
+from config import Settings
+from core.embedding import EmbeddingService
 
 
 def test_embedding_service_not_loaded_at_init():
@@ -23,9 +23,9 @@ def test_ensure_loaded_calls_transformers_factories():
     settings = Settings(device="cpu")
     service = EmbeddingService(settings)
     with (
-        patch("clip_retrieval.core.embedding.CLIPModel") as MockModel,
-        patch("clip_retrieval.core.embedding.CLIPTokenizer") as MockTok,
-        patch("clip_retrieval.core.embedding.CLIPProcessor") as MockProc,
+        patch("core.embedding.CLIPModel") as MockModel,
+        patch("core.embedding.CLIPTokenizer") as MockTok,
+        patch("core.embedding.CLIPProcessor") as MockProc,
     ):
         MockModel.from_pretrained.return_value.to.return_value = MockModel.from_pretrained.return_value
         service._ensure_loaded()

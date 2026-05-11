@@ -7,13 +7,13 @@ import logging
 import gradio as gr
 import uvicorn
 
-from clip_retrieval.api.app import create_app
-from clip_retrieval.api.dependencies import (
+from api.app import create_app
+from api.dependencies import (
     get_image_service,
     get_search_service,
     get_settings,
 )
-from clip_retrieval.ui.gradio_app import build_ui
+from ui.gradio_app import build_ui
 
 
 def main() -> None:

@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING
 import gradio as gr
 
 if TYPE_CHECKING:
-    from clip_retrieval.core.image_service import ImageService
-    from clip_retrieval.core.search import SearchService
+    from core.image_service import ImageService
+    from core.search import SearchService
 
 logger = logging.getLogger(__name__)
 

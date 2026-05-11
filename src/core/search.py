@@ -7,11 +7,11 @@ from typing import TYPE_CHECKING
 
 from PIL import Image
 
-from clip_retrieval.core.embedding import EmbeddingService
-from clip_retrieval.core.schemas import SearchResult
+from core.embedding import EmbeddingService
+from core.schemas import SearchResult
 
 if TYPE_CHECKING:
-    from clip_retrieval.db.vector_store import VectorStore
+    from db.vector_store import VectorStore
 
 logger = logging.getLogger(__name__)
 

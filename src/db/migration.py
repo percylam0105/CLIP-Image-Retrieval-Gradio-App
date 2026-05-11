@@ -9,10 +9,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from clip_retrieval.config import Settings
-from clip_retrieval.core.indexing import IndexingService
-from clip_retrieval.db.object_store import ObjectStore
-from clip_retrieval.db.vector_store import VectorStore
+from config import Settings
+from core.indexing import IndexingService
+from db.object_store import ObjectStore
+from db.vector_store import VectorStore
 
 logger = logging.getLogger(__name__)
 

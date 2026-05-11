@@ -7,10 +7,10 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from clip_retrieval.api.dependencies import get_indexing_service, get_vector_store
-from clip_retrieval.api.schemas import IndexRequest, IndexResponse
-from clip_retrieval.core.indexing import IndexingService
-from clip_retrieval.db.vector_store import VectorStore
+from api.dependencies import get_indexing_service, get_vector_store
+from api.schemas import IndexRequest, IndexResponse
+from core.indexing import IndexingService
+from db.vector_store import VectorStore
 
 logger = logging.getLogger(__name__)
 
