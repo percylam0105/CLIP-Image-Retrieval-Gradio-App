@@ -8,7 +8,7 @@ import numpy as np
 import torch
 from transformers import CLIPModel, CLIPProcessor, CLIPTokenizer
 
-from clip_retrieval.config import Settings
+from config import Settings
 
 logger = logging.getLogger(__name__)
 

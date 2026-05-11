@@ -11,12 +11,12 @@ import numpy as np
 from PIL import Image
 from tqdm import tqdm
 
-from clip_retrieval.config import Settings
-from clip_retrieval.core.embedding import EmbeddingService
+from config import Settings
+from core.embedding import EmbeddingService
 
 if TYPE_CHECKING:
-    from clip_retrieval.db.object_store import ObjectStore
-    from clip_retrieval.db.vector_store import VectorStore
+    from db.object_store import ObjectStore
+    from db.vector_store import VectorStore
 
 logger = logging.getLogger(__name__)
 

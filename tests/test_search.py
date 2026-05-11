@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from clip_retrieval.core.search import SearchService
+from core.search import SearchService
 
 
 def _seed_collection(vector_store):

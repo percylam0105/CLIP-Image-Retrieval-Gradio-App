@@ -4,12 +4,12 @@
 
 # Repo data that shouldn't be in the image
 DeepFashion/
-Source/
 Source-huggingface/
 Notebook for finetuning/
 docs/
 tests/
 scripts/
+.venv/
 
 # Caches
 __pycache__/

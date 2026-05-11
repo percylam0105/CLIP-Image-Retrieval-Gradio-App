@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from clip_retrieval.db.object_store import ObjectStore
+    from db.object_store import ObjectStore
 
 
 class ImageService:

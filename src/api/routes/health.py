@@ -6,17 +6,17 @@ import logging
 
 from fastapi import APIRouter, Depends
 
-from clip_retrieval.api.dependencies import (
+from api.dependencies import (
     get_embedding_service,
     get_object_store,
     get_settings,
     get_vector_store,
 )
-from clip_retrieval.api.schemas import HealthResponse
-from clip_retrieval.config import Settings
-from clip_retrieval.core.embedding import EmbeddingService
-from clip_retrieval.db.object_store import ObjectStore
-from clip_retrieval.db.vector_store import VectorStore
+from api.schemas import HealthResponse
+from config import Settings
+from core.embedding import EmbeddingService
+from db.object_store import ObjectStore
+from db.vector_store import VectorStore
 
 logger = logging.getLogger(__name__)
 

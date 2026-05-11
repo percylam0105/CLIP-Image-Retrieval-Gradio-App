@@ -9,8 +9,8 @@ import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
-from clip_retrieval.api.app import create_app
-from clip_retrieval.api.dependencies import (
+from api.app import create_app
+from api.dependencies import (
     get_embedding_service,
     get_image_service,
     get_indexing_service,
@@ -19,8 +19,8 @@ from clip_retrieval.api.dependencies import (
     get_settings,
     get_vector_store,
 )
-from clip_retrieval.core.image_service import ImageService
-from clip_retrieval.core.search import SearchService
+from core.image_service import ImageService
+from core.search import SearchService
 
 
 def _seed(vector_store):

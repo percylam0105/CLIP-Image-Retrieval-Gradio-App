@@ -1,13 +1,9 @@
-# Architecture — CLIP Image Retrieval V2
+# Architecture
 
-## Goals
-
-V2 refactors the original Gradio standalone script into a production-ready MVP:
-
-- Replace file-based storage (`df.csv` + `df_image_embeds.npy` + FAISS `.index`) with a **Qdrant vector database**.
-- Replace the local image directory with **MinIO object storage**.
-- Expose the retrieval engine over both a **FastAPI REST API** and a **Gradio UI** in a single process.
-- Package the entire stack with **Docker + docker-compose** so a single `make docker-up` brings up Qdrant + MinIO + the app.
+CLIP Image Retrieval is a single Python service that exposes a fine-tuned CLIP
+model for fashion image search. It runs as a FastAPI application with a Gradio
+UI mounted on top, and persists its state in two external services: Qdrant for
+the vector index and MinIO for the image catalogue.
 
 ## High-level diagram
 
@@ -15,7 +11,7 @@ V2 refactors the original Gradio standalone script into a production-ready MVP:
 ┌─────────────────────────────────────────────┐
 │              Client (Browser)                │
 ├─────────────┬───────────────────────────────┤
-│  Gradio UI  │     Swagger/ReDoc Docs        │
+│  Gradio UI  │     Swagger / ReDoc Docs      │
 │  /ui        │     /docs                     │
 ├─────────────┴───────────────────────────────┤
 │              FastAPI Application              │
@@ -38,69 +34,127 @@ V2 refactors the original Gradio standalone script into a production-ready MVP:
 └─────────────────────────────────────────────┘
 ```
 
-## Package layout (`src/clip_retrieval/`)
+## Components
+
+The application source lives entirely under `src/` with a flat package layout —
+each subdirectory is an independently importable top-level package.
 
 | Path | Responsibility |
 |---|---|
-| `config.py` | Pydantic `Settings` aggregating CLIP / Qdrant / MinIO / API / legacy paths from env + `.env`. |
-| `core/schemas.py` | Internal dataclasses: `SearchResult`, `ImageMeta`, `CollectionInfo`. |
-| `core/embedding.py` | `EmbeddingService` — lazy-loaded CLIP model with `@torch.no_grad()` text/image feature extraction. |
-| `core/search.py` | `SearchService` — coordinates `EmbeddingService` + `VectorStore`; validates input. |
-| `core/indexing.py` | `IndexingService` — scans a directory, encodes images, uploads to MinIO, upserts into Qdrant. |
-| `core/image_service.py` | `ImageService` — façade exposing presigned URLs and raw bytes. |
-| `db/vector_store.py` | `VectorStore` — Qdrant client wrapper (3 modes: memory / local / remote), HNSW cosine collection. |
-| `db/object_store.py` | `ObjectStore` — MinIO client wrapper scoped to a bucket. |
-| `db/migration.py` | `MigrationService` — bulk migrate legacy `df.csv` + `df_image_embeds.npy` + `captions.json`. |
-| `api/app.py` | `create_app()` FastAPI factory with CORS + 3 routers. |
-| `api/dependencies.py` | `lru_cache` DI container; FastAPI `Depends` targets. |
-| `api/schemas.py` | Pydantic request / response models. |
-| `api/routes/*` | `health.py`, `search.py` (`/api/v1/search/{text,image}`), `index.py` (`/api/v1/index/`). |
-| `ui/gradio_app.py` | `build_ui(search_service, image_service)` — Gradio Blocks UI, mounted at `/ui`. |
-| `__main__.py` | Entry point — wires services, mounts Gradio, starts uvicorn. |
+| `src/config.py` | `Settings` (pydantic-settings) — CLIP / Qdrant / MinIO / API / legacy paths from env + `.env`. |
+| `src/core/schemas.py` | Plain dataclasses passed between services: `SearchResult`, `ImageMeta`, `CollectionInfo`. |
+| `src/core/embedding.py` | `EmbeddingService` — lazy-loaded CLIP model with `@torch.no_grad()` text / image feature extraction. |
+| `src/core/search.py` | `SearchService` — coordinates `EmbeddingService` + `VectorStore`, validates input. |
+| `src/core/indexing.py` | `IndexingService` — scans a directory, encodes images, uploads to MinIO, upserts into Qdrant. |
+| `src/core/image_service.py` | `ImageService` — façade over `ObjectStore` returning presigned URLs and raw bytes. |
+| `src/db/vector_store.py` | `VectorStore` — Qdrant client wrapper (3 modes: memory / local / remote), HNSW cosine collection. |
+| `src/db/object_store.py` | `ObjectStore` — MinIO client wrapper scoped to a bucket. |
+| `src/db/migration.py` | `MigrationService` — bulk migrate legacy `df.csv` + `df_image_embeds.npy` + `captions.json`. |
+| `src/api/app.py` | `create_app()` FastAPI factory with CORS + 3 routers. |
+| `src/api/dependencies.py` | `lru_cache`-backed DI container; FastAPI `Depends` targets. |
+| `src/api/schemas.py` | Pydantic request / response models. |
+| `src/api/routes/*` | `health.py`, `search.py` (`/api/v1/search/{text,image}`), `index.py` (`/api/v1/index/`). |
+| `src/ui/gradio_app.py` | `build_ui(search_service, image_service)` — Gradio Blocks UI, mounted at `/ui`. |
+| `src/server.py` | Entry point — wires services, mounts Gradio, starts uvicorn. Exposed as the `clip-retrieval` console script. |
 
-## Data flow
+### Service layer
 
-### Text search
+Four service classes encapsulate the domain logic and are reused by both the
+REST routes and the Gradio UI:
 
-1. Client `POST /api/v1/search/text` with `{ "query": "...", "top_k": N }`.
-2. `SearchService.search_by_text` calls `EmbeddingService.get_text_features` → 512-d vector.
-3. `VectorStore.search` uses `client.query_points` against the `fashion_images` Qdrant collection with cosine distance.
-4. Each hit is enriched with a presigned MinIO URL via `ImageService.get_image_url`.
-5. Response body: `SearchResponse(results=[SearchResultItem(image_path, image_url, score, caption, filename), …], total, query)`.
+- **`EmbeddingService`** owns the CLIP model. Loading is *lazy* — the model
+  files are downloaded and moved to GPU/CPU only on the first call to
+  `get_text_features` / `get_image_features`. This keeps process startup cheap
+  and lets the `/health` endpoint report `model_loaded=false` until real
+  traffic arrives.
+- **`SearchService`** is the orchestrator for read traffic: validate input →
+  embed → query Qdrant → return `list[SearchResult]`.
+- **`IndexingService`** is the orchestrator for write traffic: walk a
+  directory, encode each image, upload it to MinIO, then upsert all vectors
+  into Qdrant in a single batched call.
+- **`ImageService`** is a thin façade over `ObjectStore` so that routes and the
+  UI don't have to know about MinIO specifics — they ask for a URL and get a
+  presigned URL.
 
-### Image search
+### Storage layer
 
-Same as text, except the request is `multipart/form-data` with an `UploadFile`; the image is decoded with PIL and fed into `EmbeddingService.get_image_features`.
+- **`VectorStore`** (Qdrant) creates the collection with `Distance.COSINE`,
+  `VectorParams(size=512)` and `HnswConfigDiff(m=32, ef_construct=200)`. Point
+  ids are `uuid5(NAMESPACE_URL, object_key)` so upserts are idempotent — the
+  same `image_path` always maps to the same point. Queries use `query_points`
+  with `SearchParams(hnsw_ef=128)`. Three modes are supported via
+  `QDRANT_MODE`:
+  - `memory`: pure in-process, great for tests.
+  - `local`: file-backed at `QDRANT_PATH`.
+  - `remote`: HTTP client against `QDRANT_URL` (+ optional `QDRANT_API_KEY`).
+- **`ObjectStore`** (MinIO) auto-creates the bucket on init, exposes
+  `upload_file` / `upload_bytes`, returns `presigned_get_object` URLs via
+  `datetime.timedelta`, and explicitly closes + releases HTTP connections in
+  `get_object`.
 
-### Indexing
+### API layer
 
-`POST /api/v1/index/` with optional `images_dir`. `IndexingService.index_directory`:
+- **`create_app()`** builds the FastAPI app with permissive CORS and three
+  routers.
+- **`dependencies.py`** uses `@lru_cache(maxsize=1)` to make every service a
+  process-wide singleton. The functions are wired into FastAPI via `Depends`,
+  which means tests can swap any service via `app.dependency_overrides[...]`.
+- **Routes**:
+  - `POST /api/v1/search/text` — Pydantic body `TextSearchRequest`, returns
+    `SearchResponse` with presigned MinIO URLs.
+  - `POST /api/v1/search/image` — multipart `UploadFile` + `?top_k=N`, decodes
+    via PIL.
+  - `POST /api/v1/index/` — optional `images_dir`, falls back to
+    `LEGACY_IMAGES_PATH`.
+  - `GET /health` — reports model load status, Qdrant collection info, and the
+    active MinIO bucket.
 
-1. Loads captions from `settings.captions_path` if present.
-2. Iterates `*.jpg|.jpeg|.png` in the directory.
-3. For each image: encode → `ObjectStore.upload_file` → append to batch.
-4. Upserts batch into Qdrant via `VectorStore.upsert_batch` (UUID5 ids, batches of 100).
+### UI layer
 
-### Migration (legacy V1 data)
+`ui/gradio_app.py::build_ui(search_service, image_service)` constructs a
+Gradio `Blocks` UI bound to the two services. It is mounted on top of the
+FastAPI app at `/ui` via `gr.mount_gradio_app`, so the entire system is served
+by a single uvicorn process.
 
-`scripts/migrate_to_qdrant.py` and `scripts/upload_images_to_minio.py` (and the underlying `db/migration.py:MigrationService`):
+The UI exposes:
 
-- `upload_images`: walk `legacy_images_path`, upload missing keys (`images/{filename}`) into MinIO.
-- `migrate_embeddings_only`: read `df.csv` + `df_image_embeds.npy` and upsert directly into Qdrant (no re-encoding).
-- `migrate_all`: do both, in order.
+- A radio toggle Text / Image,
+- A Top-K slider (1–50),
+- A text input *or* image uploader,
+- A gallery rendering presigned MinIO URLs,
+- An "on select" handler that reveals the score + caption of the chosen
+  result.
 
 ## Deployment
 
 `docker-compose.yml` brings up three services on a single Compose network:
 
-| Service | Image | Ports |
-|---|---|---|
-| `qdrant` | `qdrant/qdrant:v1.12.1` | `6333` (REST), `6334` (gRPC) |
-| `minio` | `minio/minio:latest` | `9000` (API), `9001` (Console UI) |
-| `app` | Built from `Dockerfile` | `8000` (FastAPI + Gradio) |
+| Service | Image | Ports | Volume |
+|---|---|---|---|
+| `qdrant` | `qdrant/qdrant:v1.12.1` | `6333` (REST), `6334` (gRPC) | `qdrant_data` |
+| `minio` | `minio/minio:latest` | `9000` (API), `9001` (Console UI) | `minio_data` |
+| `app` | Built from `Dockerfile` | `8000` (FastAPI + Gradio) | — |
 
-The `app` service reaches `qdrant` and `minio` over the Compose network with `QDRANT_URL=http://qdrant:6333` and `MINIO_ENDPOINT=minio:9000`. Volumes `qdrant_data` and `minio_data` persist state across restarts.
+Inside the network the `app` service reaches Qdrant at `http://qdrant:6333`
+and MinIO at `minio:9000`. The Dockerfile installs dependencies with
+[`uv`](https://docs.astral.sh/uv/) using `uv sync --frozen --no-dev` against
+`uv.lock` for deterministic builds, and ships a virtual environment at
+`/opt/venv` so the `clip-retrieval` console script is on `PATH`.
 
 ## Configuration
 
-All settings are derived from environment variables (and optionally a local `.env`, see `.env.example`). See `Settings` in `src/clip_retrieval/config.py` for the full list and defaults.
+All settings are derived from environment variables (and optionally a local
+`.env`). See `Settings` in `src/config.py` for the full list and defaults, and
+[`.env.example`](../.env.example) for a copy-paste template.
+
+## Testing
+
+The test suite under `tests/` runs against:
+
+- Qdrant in **memory mode** — no external service required.
+- A `MagicMock` `ObjectStore` returning deterministic presigned URLs.
+- A deterministic embedding service that derives 512-d vectors from input
+  hashes, so retrieval results are stable across runs.
+- FastAPI's `TestClient` with `app.dependency_overrides` injecting the fakes.
+
+The full suite finishes in ~3 seconds.

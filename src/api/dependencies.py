@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from clip_retrieval.config import Settings
-from clip_retrieval.core.embedding import EmbeddingService
-from clip_retrieval.core.image_service import ImageService
-from clip_retrieval.core.indexing import IndexingService
-from clip_retrieval.core.search import SearchService
-from clip_retrieval.db.object_store import ObjectStore
-from clip_retrieval.db.vector_store import VectorStore
+from config import Settings
+from core.embedding import EmbeddingService
+from core.image_service import ImageService
+from core.indexing import IndexingService
+from core.search import SearchService
+from db.object_store import ObjectStore
+from db.vector_store import VectorStore
 
 
 @lru_cache(maxsize=1)
