@@ -7,31 +7,46 @@ the vector index and MinIO for the image catalogue.
 
 ## High-level diagram
 
-```
-┌─────────────────────────────────────────────┐
-│              Client (Browser)                │
-├─────────────┬───────────────────────────────┤
-│  Gradio UI  │     Swagger / ReDoc Docs      │
-│  /ui        │     /docs                     │
-├─────────────┴───────────────────────────────┤
-│              FastAPI Application              │
-│  ┌─────────┐ ┌──────────┐ ┌──────────────┐ │
-│  │ Search  │ │ Indexing │ │   Health     │ │
-│  │ Routes  │ │ Routes   │ │   Routes     │ │
-│  └────┬────┘ └────┬─────┘ └──────────────┘ │
-│       │           │                          │
-│  ┌────┴───────────┴──────────────────────┐  │
-│  │         Service Layer                  │  │
-│  │  EmbeddingService  SearchService       │  │
-│  │  IndexingService   ImageService        │  │
-│  └────┬───────────────────────┬──────────┘  │
-│       │                       │              │
-│  ┌────┴────┐            ┌────┴────┐         │
-│  │ Qdrant  │            │  MinIO  │         │
-│  │ Vector  │            │ Object  │         │
-│  │   DB    │            │ Storage │         │
-│  └─────────┘            └─────────┘         │
-└─────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph Client["Client (browser)"]
+        UI["Gradio UI<br/>/ui"]
+        DOCS["Swagger / ReDoc<br/>/docs, /redoc"]
+    end
+
+    subgraph App["FastAPI application (uvicorn)"]
+        direction TB
+        subgraph Routes["REST routes"]
+            SR["Search routes<br/>POST /api/v1/search/{text,image}"]
+            IR["Indexing routes<br/>POST /api/v1/index/"]
+            HR["Health route<br/>GET /health"]
+        end
+        subgraph Services["Service layer"]
+            ES["EmbeddingService<br/>(lazy CLIP model)"]
+            SS["SearchService"]
+            IXS["IndexingService"]
+            IMS["ImageService"]
+        end
+        SR --> SS
+        IR --> IXS
+        HR --> ES
+    end
+
+    subgraph Storage["Persistence"]
+        Q[("Qdrant<br/>Vector DB<br/>HNSW cosine")]
+        M[("MinIO<br/>Object storage<br/>bucket: fashion-images")]
+    end
+
+    UI -->|HTTP| Routes
+    DOCS -->|HTTP| Routes
+    SS -->|embed query| ES
+    SS -->|vector search| Q
+    IXS -->|encode image| ES
+    IXS -->|upload image| M
+    IXS -->|upsert vector| Q
+    IMS -->|presigned URL| M
+    HR -.->|collection_info| Q
+    HR -.->|bucket name| M
 ```
 
 ## Components
