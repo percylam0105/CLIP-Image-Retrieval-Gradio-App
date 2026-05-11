@@ -1,0 +1,98 @@
+"""End-to-end tests for the FastAPI routes (services replaced via dependency overrides)."""
+
+from __future__ import annotations
+
+import io
+
+import numpy as np
+import pytest
+from fastapi.testclient import TestClient
+from PIL import Image
+
+from clip_retrieval.api.app import create_app
+from clip_retrieval.api.dependencies import (
+    get_embedding_service,
+    get_image_service,
+    get_indexing_service,
+    get_object_store,
+    get_search_service,
+    get_settings,
+    get_vector_store,
+)
+from clip_retrieval.core.image_service import ImageService
+from clip_retrieval.core.search import SearchService
+
+
+def _seed(vector_store):
+    rng = np.random.default_rng(123)
+    vectors = rng.random((4, 512)).astype(np.float32)
+    keys = [f"images/api_{i}.jpg" for i in range(4)]
+    vector_store.upsert_batch(keys, vectors, {f"api_{i}.jpg": f"cap {i}" for i in range(4)})
+
+
+@pytest.fixture()
+def client(settings, vector_store, fake_embedding_service, fake_object_store):
+    _seed(vector_store)
+    search_service = SearchService(fake_embedding_service, vector_store)
+    image_service = ImageService(fake_object_store)
+
+    app = create_app()
+    app.dependency_overrides[get_settings] = lambda: settings
+    app.dependency_overrides[get_vector_store] = lambda: vector_store
+    app.dependency_overrides[get_object_store] = lambda: fake_object_store
+    app.dependency_overrides[get_embedding_service] = lambda: fake_embedding_service
+    app.dependency_overrides[get_search_service] = lambda: search_service
+    app.dependency_overrides[get_image_service] = lambda: image_service
+
+    # Indexing service isn't exercised here; raise if accidentally pulled.
+    def _missing_indexing():
+        raise AssertionError("indexing service should not be invoked in this test")
+
+    app.dependency_overrides[get_indexing_service] = _missing_indexing
+
+    with TestClient(app) as c:
+        yield c
+
+
+def test_health(client, fake_object_store):
+    r = client.get("/health")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["status"] == "ok"
+    assert body["model_loaded"] is True
+    assert body["minio_bucket"] == fake_object_store.bucket
+
+
+def test_search_text(client):
+    r = client.post("/api/v1/search/text", json={"query": "blue shirt", "top_k": 2})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["total"] == 2
+    assert body["query"] == "blue shirt"
+    assert len(body["results"]) == 2
+    for item in body["results"]:
+        assert item["image_url"].startswith("http://minio/images/")
+
+
+def test_search_text_validation(client):
+    r = client.post("/api/v1/search/text", json={"query": "", "top_k": 5})
+    assert r.status_code == 422  # Pydantic min_length
+
+    r = client.post("/api/v1/search/text", json={"query": "ok", "top_k": 0})
+    assert r.status_code == 422
+
+
+def test_search_image(client):
+    img = Image.new("RGB", (8, 8), color="red")
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    buf.seek(0)
+
+    r = client.post(
+        "/api/v1/search/image",
+        files={"file": ("test.png", buf, "image/png")},
+        params={"top_k": 1},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["total"] == 1
